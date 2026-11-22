@@ -1,4 +1,5 @@
 import {attachTail} from './tail.js';
+import './handoff.js';
 attachTail();
 const feedback = document.querySelector('#feedback');
 const sample = document.querySelector('#sample');

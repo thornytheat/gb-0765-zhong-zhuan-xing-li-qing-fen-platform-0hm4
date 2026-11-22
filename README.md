@@ -16,3 +16,7 @@
 字段与边界见 [数据定义](docs/DATA-DICTIONARY.md)，入口和可执行反例见 [深度登记](docs/DEPTH.md)。
 
 前五阶段也接受 `POST /api/stage/<key>`，提交同样的样例或原件，按依赖顺序只计算到选中阶段。
+
+## 错装处置单交接
+
+归档后在错载与漏扫归因页按本批错装记录建单，初始责任班组为原班。`POST /api/runs/<run>/dispositions` 幂等建单，`GET` 查处置板与待处置/已处置件数。交接用 `POST /api/dispositions/<order>/handovers`，提交 `idempotency_key`、`from_crew`、`to_crew`：原班与新班同时提交时只有当前责任班组一方成功，同一请求重跑（同幂等键）重放首次结局、不重复交接，失败后换新幂等键即可重试。撤下扫件经回放确认才能 `POST /api/dispositions/<order>/close`（可用 `confirm_run` 指向含撤下扫件的另一归档），关单后对账待处置件数联动更新。`GET /api/dispositions/<order>/attribution` 可查当前责任班组与 OPEN/HANDOVER/CLOSE 交接经过。

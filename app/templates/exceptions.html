@@ -1,3 +1,22 @@
 <div class="panel-head"><h2>错载与漏扫归因</h2><label for="bag-filter">行李牌 <input id="bag-filter" placeholder="输入编号" inputmode="numeric"></label></div>
 <div class="table-scroll"><table id="bag-list"><thead><tr><th>行李牌</th><th>计划段</th><th>去向</th><th>归因</th><th>错装段</th><th>扫描行</th></tr></thead><tbody>
 {% for row in stages.exceptions.rows %}<tr data-tag="{{ row.tag }}"><td>{{ row.tag }}</td><td>{{ row.planned or '—' }}</td><td>{{ {'loaded':'已装','pending':'待证','not_loaded':'未装','unlisted':'清单外'}[row.status] }}</td><td title="{{ row.reason or '' }}">{{ reasons.get(row.reason, '装载证实') }}</td><td>{{ row.wrong_legs|join(', ') or '—' }}</td><td class="num">{{ row.source_lines|join(', ') or '—' }}</td></tr>{% endfor %}</tbody></table></div>
+
+<div class="panel-head"><h2>错装处置单与班组交接</h2>{% if manifest %}<form id="disposition-seed" method="post" action="{{ url_for('handovers.seed', run_id=manifest.id) }}"><button type="submit">按本批错装建单</button></form>{% else %}<span>归档后可建处置单</span>{% endif %}</div>
+{% if not manifest %}<p class="empty">样例预览不建单，先归档复算。</p>
+{% elif not dispositions or not dispositions.orders %}<p class="empty">本批尚未建单，点击右上角按错装记录建单。</p>
+{% else %}
+<div class="table-scroll"><table id="disposition-list"><thead><tr><th>处置单</th><th>行李牌</th><th>错装段</th><th>当前责任班组</th><th>状态</th><th>交接经过</th><th>操作</th></tr></thead><tbody>
+{% for order in dispositions.orders %}<tr data-order="{{ order.id }}">
+<td><span class="clip" title="{{ order.id }}">{{ order.id[:12] }}</span></td>
+<td>{{ order.tag }}</td><td>{{ order.leg }}</td>
+<td><b class="owner">{{ order.owner }}</b></td>
+<td class="{{ 'ok' if order.status == 'closed' else 'warn' }}">{{ {'open':'待处置','closed':'已关单'}[order.status] }}</td>
+<td><ol class="event-line">{% for event in order.events %}<li><time>{{ event.at[11:19] }}</time> {{ {'OPEN':'建单','HANDOVER':'交接','CLOSE':'关单'}[event.kind] }}{% if event.from_crew %} {{ event.from_crew }} → {{ event.to_crew }}{% elif event.kind == 'OPEN' %} · 责任班组 {{ event.to_crew }}{% endif %}{% if event.note %} · {{ event.note }}{% endif %}</li>{% endfor %}</ol></td>
+<td>{% if order.status == 'open' %}
+<form class="handoff-form" data-order="{{ order.id }}"><input name="from_crew" value="{{ order.owner }}" aria-label="交出班组" required><input name="to_crew" placeholder="接班班组" aria-label="接班班组" required><input type="hidden" name="idempotency_key" value="{{ request_token(12) }}"><button type="submit">交接</button></form>
+<form class="close-form" data-order="{{ order.id }}"><button type="submit">回放确认关单</button></form>
+{% else %}<span class="neutral">已于 {{ order.closed_at[11:19] }} 关单</span>{% endif %}</td>
+</tr>{% endfor %}</tbody></table></div>
+<div class="equation"><b>{{ dispositions.tally.disposition_open }}</b><span>待处置件</span> + <b>{{ dispositions.tally.disposition_closed }}</b><span>已处置件</span> = <b>{{ dispositions.tally.disposition_total }}</b><span>错装处置件</span></div>
+{% endif %}

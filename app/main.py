@@ -1,4 +1,5 @@
 import os
+from secrets import token_hex
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import RequestEntityTooLarge
 from .config import VERSION
@@ -6,16 +7,21 @@ from .errors import DeskError
 from .modules.archive.routes import bp as archive
 from .modules.archive.store import Archive
 from .modules.evidence.routes import bp as evidence
+from .modules.handovers.routes import bp as handovers
+from .modules.handovers.store import HandoverStore
 from .web import bp as desk
 
 
 def create_app(path=None):
     app = Flask(__name__)
+    app.jinja_env.globals['request_token'] = token_hex
     app.select_jinja_autoescape = lambda name: name is None or name.endswith(('.html', '.jinja'))
     app.url_map.redirect_defaults = False
     app.config['MAX_CONTENT_LENGTH'] = 2_000_000
-    app.extensions['transfer_archive'] = Archive(path or os.getenv('LUGGAGE_DB', 'var/transfer.sqlite3'))
-    for routes in (archive, evidence, desk):
+    db_path = path or os.getenv('LUGGAGE_DB', 'var/transfer.sqlite3')
+    app.extensions['transfer_archive'] = Archive(db_path)
+    app.extensions['transfer_handovers'] = HandoverStore(db_path)
+    for routes in (archive, evidence, handovers, desk):
         app.register_blueprint(routes)
 
     @app.get('/health')

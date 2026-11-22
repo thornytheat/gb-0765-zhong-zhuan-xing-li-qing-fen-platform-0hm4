@@ -3,6 +3,7 @@ from .errors import DeskError
 from .input import sample, submission
 from .modules.archive.routes import store
 from .modules.evidence.service import index
+from .modules.handovers.service import board as disposition_board
 from .pipeline import compute
 from .reasons import REASONS
 
@@ -46,7 +47,18 @@ def desk(key):
     if key not in DESK:
         raise DeskError('NO_STAGE', '业务入口不存在', 404)
     files, stages, manifest, name = snapshot()
-    context = dict(stages=stages, ledger=stages['ledger']['counts'], names=DESK, key=key, reasons=REASONS,
+    dispositions = disposition_board(store_handovers(), manifest['id']) if manifest else None
+    # 只复制计数后再合并，绝不改动归档结果原文（证据页要核对结果哈希）
+    ledger_counts = dict(stages['ledger']['counts'])
+    if dispositions:
+        ledger_counts.update(dispositions['tally'])
+    context = dict(stages=stages, ledger=ledger_counts, names=DESK, key=key, reasons=REASONS,
                    selected=name, manifest=manifest, archive=store().list() if key == 'archive' else [],
+                   dispositions=dispositions,
                    report=index(files, dict(stages=stages, manifest=manifest)) if key == 'evidence' and manifest else None)
     return render_template('desk.html', **context)
+
+
+def store_handovers():
+    from flask import current_app
+    return current_app.extensions['transfer_handovers']
